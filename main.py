@@ -11,8 +11,14 @@ from pydantic import BaseModel
 import yt_dlp
 import imageio_ffmpeg
 
-# Get the path to the statically built ffmpeg from imageio_ffmpeg
-FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
+import imageio_ffmpeg
+import shutil
+
+# Use system ffmpeg if available (e.g. on Render), otherwise fallback to imageio_ffmpeg
+if shutil.which("ffmpeg"):
+    FFMPEG_PATH = "ffmpeg"
+else:
+    FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 app = FastAPI()
 
@@ -151,6 +157,7 @@ def create_snippet(req: SnippetRequest):
         cmd = [
             FFMPEG_PATH,
             '-y', # overwrite
+            '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', # Bypass 403 blocks
             '-ss', str(start_sec),
             '-i', stream_url,
             '-t', str(end_sec - start_sec),
