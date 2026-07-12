@@ -91,7 +91,7 @@ def create_snippet(req: SnippetRequest):
         meta = get_spotify_metadata(url)
         if meta:
             song_title = meta
-            url = f"ytsearch1:{meta}"
+            url = f"scsearch1:{meta}"
         else:
             raise HTTPException(status_code=400, detail="Could not extract Spotify metadata")
     else:
