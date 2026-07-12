@@ -96,7 +96,11 @@ def create_snippet(req: SnippetRequest):
             raise HTTPException(status_code=400, detail="Could not extract Spotify metadata")
     else:
         # We can extract title directly with yt_dlp for soundcloud/youtube
-        ydl_opts = {'quiet': True, 'skip_download': True}
+        ydl_opts = {
+            'quiet': True, 
+            'skip_download': True,
+            'extractor_args': {'youtube': {'player_client': ['android']}}
+        }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -113,6 +117,8 @@ def create_snippet(req: SnippetRequest):
         ydl_opts = {
             'format': 'bestaudio/best',
             'quiet': True,
+            'no_warnings': True,
+            'extractor_args': {'youtube': {'player_client': ['android']}} # Bypass bot detection
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
