@@ -131,7 +131,7 @@ def create_snippet(req: SnippetRequest):
             '-t', str(end_sec - start_sec),
             '-vn', # no video
             '-c:a', 'libmp3lame',
-            '-q:a', '2', # high quality
+            '-b:a', '320k', # maximum mp3 quality
             output_filename
         ]
         
