@@ -15,18 +15,43 @@ import imageio_ffmpeg
 import shutil
 import urllib.request
 import urllib.parse
-import re
+import json
+import base64
+from Crypto.Cipher import DES
+from Crypto.Util.Padding import unpad
 
-def search_youtube(query):
-    query = urllib.parse.quote(query)
-    url = f"https://www.youtube.com/results?search_query={query}"
-    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-    html = urllib.request.urlopen(req).read().decode('utf-8')
-    video_ids = re.findall(r'"videoId":"(.*?)"', html)
-    if video_ids:
-        valid_ids = [vid for vid in video_ids if len(vid) == 11]
-        return valid_ids[0] if valid_ids else None
-    return None
+def get_jiosaavn_stream(query):
+    query_encoded = urllib.parse.quote(query)
+    search_url = f"https://www.jiosaavn.com/api.php?p=1&q={query_encoded}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=1&__call=search.getResults"
+    
+    req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+    res = urllib.request.urlopen(req).read().decode('utf-8')
+    data = json.loads(res)
+    
+    results = data.get('results', [])
+    if not results:
+        raise Exception("Song not found on JioSaavn")
+        
+    song_id = results[0]['id']
+    
+    details_url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids={song_id}"
+    req2 = urllib.request.Request(details_url, headers={'User-Agent': 'Mozilla/5.0'})
+    res2 = urllib.request.urlopen(req2).read().decode('utf-8')
+    details = json.loads(res2)
+    
+    encrypted_url = details[song_id]['encrypted_media_url']
+    
+    des_cipher = DES.new(b"38346591", DES.MODE_ECB)
+    decrypted_url = unpad(des_cipher.decrypt(base64.b64decode(encrypted_url)), 8).decode('utf-8')
+    
+    # Try to get 320kbps if available, otherwise fallback to default
+    high_quality_url = decrypted_url.replace("_96.mp4", "_320.mp4").replace("_96.m4a", "_320.m4a")
+    
+    try:
+        urllib.request.urlopen(urllib.request.Request(high_quality_url, headers={'User-Agent': 'Mozilla/5.0'}))
+        return high_quality_url
+    except:
+        return decrypted_url
 
 # Use system ffmpeg if available (e.g. on Render), otherwise fallback to imageio_ffmpeg
 if shutil.which("ffmpeg"):
@@ -154,20 +179,15 @@ def create_snippet(req: SnippetRequest):
 
     stream_url = None
     try:
-        from pytubefix import YouTube
-        if "youtube.com" in url or "youtu.be" in url:
+        # We exclusively use our custom JioSaavn engine to completely bypass all YouTube bot checks
+        if "spotify.com" in url or "soundcloud.com" in url or "youtube.com" not in url:
+            stream_url = get_jiosaavn_stream(search_query)
+        else:
+            # If they pasted a direct youtube URL, try searching JioSaavn with its title
+            from pytubefix import YouTube
             yt = YouTube(url, client="ANDROID_VR")
             song_title = yt.title
-            stream_url = yt.streams.get_audio_only().url
-        elif "spotify.com" in url:
-            video_id = search_youtube(search_query)
-            if video_id:
-                yt = YouTube(f"https://www.youtube.com/watch?v={video_id}", client="ANDROID_VR")
-                stream_url = yt.streams.get_audio_only().url
-            else:
-                raise Exception("Song not found on YouTube")
-        else:
-            raise Exception("Unsupported URL format")
+            stream_url = get_jiosaavn_stream(song_title)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audio stream: {str(e)}")
 
