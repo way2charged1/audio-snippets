@@ -116,7 +116,7 @@ def create_snippet(req: SnippetRequest):
         meta = get_spotify_metadata(url)
         if meta:
             song_title = meta
-            url = f"scsearch1:{meta}"
+            search_query = meta
         else:
             raise HTTPException(status_code=400, detail="Could not extract Spotify metadata")
     else:
@@ -138,19 +138,39 @@ def create_snippet(req: SnippetRequest):
     snippet_id = str(uuid.uuid4())[:8]
     output_filename = os.path.join(SNIPPETS_DIR, f"{snippet_id}.mp3")
 
+    stream_url = None
     try:
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'quiet': True,
-            'no_warnings': True,
-            'extractor_args': {'youtube': {'player_client': ['android']}} # Bypass bot detection
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            if 'entries' in info:
-                info = info['entries'][0]
-            
-            stream_url = info['url']
+        from pytubefix import YouTube, Search
+        if "youtube.com" in url or "youtu.be" in url:
+            yt = YouTube(url)
+            song_title = yt.title
+            stream_url = yt.streams.get_audio_only().url
+        elif "spotify.com" in url:
+            results = Search(search_query)
+            if len(results.videos) > 0:
+                yt = results.videos[0]
+                # We keep the original Spotify title, but get the stream URL from YouTube
+                stream_url = yt.streams.get_audio_only().url
+            else:
+                raise Exception("Song not found")
+        else:
+            # Fallback to yt-dlp for soundcloud etc
+            ydl_opts = {
+                'format': 'bestaudio/best',
+                'quiet': True,
+                'no_warnings': True,
+                'extractor_args': {'youtube': {'player_client': ['android']}}
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if 'entries' in info:
+                    info = info['entries'][0]
+                stream_url = info['url']
+                song_title = info.get('title', song_title)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch audio stream: {str(e)}")
+
+    try:
             
         import subprocess
         # Slice audio using ffmpeg directly
