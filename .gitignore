@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.pyc
+
+# Local Data
+snippets/
+database.json
+ffmpeg.exe

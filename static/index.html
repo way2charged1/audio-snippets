@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Snippet Sharer</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background">
+        <div class="blob blob1"></div>
+        <div class="blob blob2"></div>
+        <div class="blob blob3"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1 id="app-title">Audio Snippets</h1>
+            <p id="app-subtitle">Extract and share your favorite moments</p>
+        </header>
+
+        <main>
+            <!-- Creator View -->
+            <div id="creator-view" class="card active">
+                <form id="snippet-form">
+                    <div class="input-group">
+                        <label for="url">Track URL (Spotify, YouTube, SoundCloud)</label>
+                        <input type="url" id="url" placeholder="https://open.spotify.com/track/..." required>
+                    </div>
+                    
+                    <div class="time-inputs">
+                        <div class="input-group">
+                            <label for="start-time">Start Time</label>
+                            <input type="text" id="start-time" placeholder="0:30" required pattern="^(\d+:)?\d{1,2}(:\d{2})?$">
+                        </div>
+                        <div class="input-group">
+                            <label for="end-time">End Time</label>
+                            <input type="text" id="end-time" placeholder="0:45" required pattern="^(\d+:)?\d{1,2}(:\d{2})?$">
+                        </div>
+                    </div>
+
+                    <button type="submit" id="generate-btn">
+                        <span class="btn-text">Generate Snippet</span>
+                        <div class="spinner hidden"></div>
+                    </button>
+                </form>
+
+                <div id="result-container" class="hidden result-box">
+                    <h3>Snippet Ready!</h3>
+                    <div class="share-box">
+                        <input type="text" id="share-link" readonly>
+                        <button id="copy-btn">Copy</button>
+                    </div>
+                    <a href="" id="view-snippet-btn" class="secondary-btn">Go to Snippet</a>
+                </div>
+            </div>
+
+            <!-- Listener View -->
+            <div id="listener-view" class="card hidden">
+                <div class="now-playing">
+                    <div class="vinyl-record">
+                        <div class="vinyl-center"></div>
+                    </div>
+                    <h2 id="listener-title">Loading...</h2>
+                    <p class="track-times" id="listener-times"></p>
+                </div>
+
+                <div class="player-controls">
+                    <audio id="audio-player" controls controlsList="nodownload"></audio>
+                </div>
+
+                <div class="action-buttons">
+                    <a href="" id="download-btn" class="primary-btn" download>Download .mp3</a>
+                    <a href="/" class="secondary-btn">Create Your Own</a>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
