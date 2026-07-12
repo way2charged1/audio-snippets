@@ -17,41 +17,59 @@ import urllib.request
 import urllib.parse
 import json
 import base64
+import re
 from Crypto.Cipher import DES
 from Crypto.Util.Padding import unpad
 
+def clean_song_title(title):
+    # Remove text in parentheses/brackets
+    title = re.sub(r'\(.*?\)', '', title)
+    title = re.sub(r'\[.*?\]', '', title)
+    # Remove common suffixes
+    title = re.sub(r'(?i)- remaster(ed)?( \d{4})?', '', title)
+    title = re.sub(r'(?i)- .*?(edit|mix|version)', '', title)
+    return title.strip()
+
 def get_jiosaavn_stream(query):
-    query_encoded = urllib.parse.quote(query)
-    search_url = f"https://www.jiosaavn.com/api.php?p=1&q={query_encoded}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=1&__call=search.getResults"
-    
-    req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
-    res = urllib.request.urlopen(req).read().decode('utf-8')
-    data = json.loads(res)
-    
-    results = data.get('results', [])
-    if not results:
-        raise Exception("Song not found on JioSaavn")
+    words = query.split()
+    # Try searching by progressively removing the last word to handle messy Spotify titles
+    for i in range(len(words), 0, -1):
+        sub_query = " ".join(words[:i])
+        query_encoded = urllib.parse.quote(sub_query)
+        search_url = f"https://www.jiosaavn.com/api.php?p=1&q={query_encoded}&_format=json&_marker=0&api_version=4&ctx=web6dot0&n=1&__call=search.getResults"
         
-    song_id = results[0]['id']
-    
-    details_url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids={song_id}"
-    req2 = urllib.request.Request(details_url, headers={'User-Agent': 'Mozilla/5.0'})
-    res2 = urllib.request.urlopen(req2).read().decode('utf-8')
-    details = json.loads(res2)
-    
-    encrypted_url = details[song_id]['encrypted_media_url']
-    
-    des_cipher = DES.new(b"38346591", DES.MODE_ECB)
-    decrypted_url = unpad(des_cipher.decrypt(base64.b64decode(encrypted_url)), 8).decode('utf-8')
-    
-    # Try to get 320kbps if available, otherwise fallback to default
-    high_quality_url = decrypted_url.replace("_96.mp4", "_320.mp4").replace("_96.m4a", "_320.m4a")
-    
-    try:
-        urllib.request.urlopen(urllib.request.Request(high_quality_url, headers={'User-Agent': 'Mozilla/5.0'}))
-        return high_quality_url
-    except:
-        return decrypted_url
+        try:
+            req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+            res = urllib.request.urlopen(req).read().decode('utf-8')
+            data = json.loads(res)
+            
+            results = data.get('results', [])
+            if not results:
+                continue # Try shorter query
+                
+            song_id = results[0]['id']
+            
+            details_url = f"https://www.jiosaavn.com/api.php?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids={song_id}"
+            req2 = urllib.request.Request(details_url, headers={'User-Agent': 'Mozilla/5.0'})
+            res2 = urllib.request.urlopen(req2).read().decode('utf-8')
+            details = json.loads(res2)
+            
+            encrypted_url = details[song_id]['encrypted_media_url']
+            
+            des_cipher = DES.new(b"38346591", DES.MODE_ECB)
+            decrypted_url = unpad(des_cipher.decrypt(base64.b64decode(encrypted_url)), 8).decode('utf-8')
+            
+            high_quality_url = decrypted_url.replace("_96.mp4", "_320.mp4").replace("_96.m4a", "_320.m4a")
+            
+            try:
+                urllib.request.urlopen(urllib.request.Request(high_quality_url, headers={'User-Agent': 'Mozilla/5.0'}))
+                return high_quality_url
+            except:
+                return decrypted_url
+        except Exception:
+            continue
+            
+    raise Exception("Song not found on JioSaavn even after fallback searches")
 
 # Use system ffmpeg if available (e.g. on Render), otherwise fallback to imageio_ffmpeg
 if shutil.which("ffmpeg"):
@@ -156,6 +174,8 @@ def create_snippet(req: SnippetRequest):
         if meta:
             song_title = meta
             search_query = meta
+            # Assuming meta is "Song Name Artist", we can try to guess the bare song title by splitting before Artist.
+            # Usually the scraper gives "Song Name Artist". We can just rely on the fallback splitting.
         else:
             raise HTTPException(status_code=400, detail="Could not extract Spotify metadata")
     else:
@@ -179,15 +199,27 @@ def create_snippet(req: SnippetRequest):
 
     stream_url = None
     try:
+        # Clean the search query to make JioSaavn more likely to find it
+        clean_query = clean_song_title(search_query)
+        
         # We exclusively use our custom JioSaavn engine to completely bypass all YouTube bot checks
         if "spotify.com" in url or "soundcloud.com" in url or "youtube.com" not in url:
-            stream_url = get_jiosaavn_stream(search_query)
+            try:
+                stream_url = get_jiosaavn_stream(clean_query)
+            except Exception:
+                # Fallback: try just the bare song name if it was from Spotify
+                fallback_query = clean_song_title(bare_song_title) if 'bare_song_title' in locals() else clean_query.split(" - ")[0]
+                stream_url = get_jiosaavn_stream(fallback_query)
         else:
             # If they pasted a direct youtube URL, try searching JioSaavn with its title
             from pytubefix import YouTube
             yt = YouTube(url, client="ANDROID_VR")
             song_title = yt.title
-            stream_url = get_jiosaavn_stream(song_title)
+            clean_title = clean_song_title(song_title)
+            try:
+                stream_url = get_jiosaavn_stream(clean_title)
+            except Exception:
+                stream_url = get_jiosaavn_stream(clean_title.split(" - ")[0])
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audio stream: {str(e)}")
 
