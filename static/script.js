@@ -111,6 +111,84 @@ document.addEventListener('DOMContentLoaded', () => {
                 vinylRecord.classList.remove('playing');
             });
 
+            // Lyrics Logic
+            function parseTime(timeStr) {
+                if (!timeStr) return 0;
+                const parts = timeStr.split(':').map(Number);
+                if (parts.length === 1) return parts[0];
+                if (parts.length === 2) return parts[0] * 60 + parts[1];
+                if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                return 0;
+            }
+
+            function parseLRC(lrcText) {
+                if (!lrcText) return [];
+                const lines = lrcText.split('\n');
+                const lyrics = [];
+                const regex = /\[(\d+):(\d+\.\d+)\](.*)/;
+                for (const line of lines) {
+                    const match = line.match(regex);
+                    if (match) {
+                        const min = parseInt(match[1]);
+                        const sec = parseFloat(match[2]);
+                        const text = match[3].trim();
+                        if (text) {
+                            lyrics.push({ time: min * 60 + sec, text: text });
+                        }
+                    }
+                }
+                return lyrics;
+            }
+
+            const lyricsContainer = document.getElementById('lyrics-container');
+            const startSec = parseTime(data.start_time);
+            const parsedLyrics = parseLRC(data.lyrics);
+            
+            if (parsedLyrics.length > 0) {
+                lyricsContainer.classList.remove('hidden');
+                lyricsContainer.innerHTML = '<div class="lyrics-padding"></div>'; // Empty padding
+                
+                parsedLyrics.forEach((lyric, index) => {
+                    const el = document.createElement('div');
+                    el.className = 'lyric-line';
+                    el.textContent = lyric.text;
+                    lyricsContainer.appendChild(el);
+                });
+                
+                lyricsContainer.innerHTML += '<div class="lyrics-padding"></div>';
+
+                audioPlayer.addEventListener('timeupdate', () => {
+                    const currentAbsoluteTime = audioPlayer.currentTime + startSec;
+                    
+                    let activeIndex = -1;
+                    for (let i = 0; i < parsedLyrics.length; i++) {
+                        if (currentAbsoluteTime >= parsedLyrics[i].time - 0.3) { // Slight lead time
+                            activeIndex = i;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    const lines = lyricsContainer.querySelectorAll('.lyric-line');
+                    lines.forEach((line, index) => {
+                        if (index === activeIndex) {
+                            if (!line.classList.contains('active')) {
+                                line.classList.add('active');
+                                const containerHeight = lyricsContainer.clientHeight;
+                                const lineTop = line.offsetTop;
+                                const lineHeight = line.clientHeight;
+                                lyricsContainer.scrollTo({
+                                    top: lineTop - (containerHeight / 2) + (lineHeight / 2),
+                                    behavior: 'smooth'
+                                });
+                            }
+                        } else {
+                            line.classList.remove('active');
+                        }
+                    });
+                });
+            }
+
         } catch (error) {
             listenerTitle.textContent = "Snippet Not Found";
             listenerTimes.textContent = "The link might be invalid or expired.";

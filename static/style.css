@@ -334,6 +334,45 @@ audio::-webkit-media-controls-time-remaining-display {
     color: white;
 }
 
+/* Lyrics Styling */
+.lyrics-container {
+    margin: 1.5rem 0;
+    max-height: 120px;
+    overflow-y: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+}
+
+.lyric-line {
+    font-family: 'Great Vibes', cursive;
+    font-size: 1.8rem;
+    color: rgba(196, 181, 253, 0.4);
+    margin: 5px 0;
+    text-align: center;
+    transition: all 0.5s ease;
+    opacity: 0.3;
+    transform: scale(0.9);
+    filter: blur(1px);
+}
+
+.lyric-line.active {
+    color: #f3e8ff;
+    opacity: 1;
+    transform: scale(1.1);
+    filter: blur(0);
+    text-shadow: 0 0 15px rgba(168, 85, 247, 0.8), 0 0 30px rgba(192, 132, 252, 0.5);
+}
+
+.lyrics-padding {
+    height: 60px;
+    flex-shrink: 0;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 600px) {
     h1 {

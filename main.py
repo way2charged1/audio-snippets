@@ -2,6 +2,7 @@ import os
 import uuid
 import re
 import urllib.request
+import urllib.parse
 import json
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -66,6 +67,24 @@ def get_spotify_metadata(url: str):
     except Exception as e:
         print(f"Spotify scrape error: {e}")
         return None
+
+def search_lyrics(track_name: str):
+    try:
+        query = urllib.parse.quote(track_name)
+        url = f"https://lrclib.net/api/search?q={query}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        response = urllib.request.urlopen(req, timeout=5)
+        data = json.loads(response.read().decode('utf-8'))
+        if data:
+            # Prefer synced lyrics
+            for track in data:
+                if track.get('syncedLyrics'):
+                    return track['syncedLyrics']
+            # Fallback to plain lyrics if absolutely necessary, but synced is preferred
+            return data[0].get('plainLyrics')
+    except Exception as e:
+        print(f"Lyrics fetch error: {e}")
+    return None
 
 class SnippetRequest(BaseModel):
     url: str
@@ -149,13 +168,17 @@ def create_snippet(req: SnippetRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
+    # Fetch Lyrics
+    lyrics = search_lyrics(song_title)
+
     # Save to DB
     db = get_db()
     db[snippet_id] = {
         "title": song_title,
         "original_url": req.url,
         "start_time": req.start_time,
-        "end_time": req.end_time
+        "end_time": req.end_time,
+        "lyrics": lyrics
     }
     save_db(db)
 
