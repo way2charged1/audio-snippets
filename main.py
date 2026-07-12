@@ -13,6 +13,20 @@ import imageio_ffmpeg
 
 import imageio_ffmpeg
 import shutil
+import urllib.request
+import urllib.parse
+import re
+
+def search_youtube(query):
+    query = urllib.parse.quote(query)
+    url = f"https://www.youtube.com/results?search_query={query}"
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    html = urllib.request.urlopen(req).read().decode('utf-8')
+    video_ids = re.findall(r'"videoId":"(.*?)"', html)
+    if video_ids:
+        valid_ids = [vid for vid in video_ids if len(vid) == 11]
+        return valid_ids[0] if valid_ids else None
+    return None
 
 # Use system ffmpeg if available (e.g. on Render), otherwise fallback to imageio_ffmpeg
 if shutil.which("ffmpeg"):
@@ -140,33 +154,20 @@ def create_snippet(req: SnippetRequest):
 
     stream_url = None
     try:
-        from pytubefix import YouTube, Search
+        from pytubefix import YouTube
         if "youtube.com" in url or "youtu.be" in url:
-            yt = YouTube(url)
+            yt = YouTube(url, client="ANDROID_VR")
             song_title = yt.title
             stream_url = yt.streams.get_audio_only().url
         elif "spotify.com" in url:
-            results = Search(search_query)
-            if len(results.videos) > 0:
-                yt = results.videos[0]
-                # We keep the original Spotify title, but get the stream URL from YouTube
+            video_id = search_youtube(search_query)
+            if video_id:
+                yt = YouTube(f"https://www.youtube.com/watch?v={video_id}", client="ANDROID_VR")
                 stream_url = yt.streams.get_audio_only().url
             else:
-                raise Exception("Song not found")
+                raise Exception("Song not found on YouTube")
         else:
-            # Fallback to yt-dlp for soundcloud etc
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'quiet': True,
-                'no_warnings': True,
-                'extractor_args': {'youtube': {'player_client': ['android']}}
-            }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                if 'entries' in info:
-                    info = info['entries'][0]
-                stream_url = info['url']
-                song_title = info.get('title', song_title)
+            raise Exception("Unsupported URL format")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audio stream: {str(e)}")
 
