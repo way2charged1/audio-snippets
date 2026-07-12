@@ -333,3 +333,41 @@ audio::-webkit-media-controls-current-time-display,
 audio::-webkit-media-controls-time-remaining-display {
     color: white;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.8rem;
+        letter-spacing: 2px;
+    }
+    
+    header p {
+        font-size: 0.9rem;
+    }
+    
+    .container {
+        padding: 1rem;
+    }
+    
+    .card {
+        padding: 1.5rem 1rem;
+    }
+    
+    .time-inputs {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .blob1 { width: 300px; height: 300px; }
+    .blob2 { width: 350px; height: 350px; }
+    .blob3 { width: 250px; height: 250px; }
+    
+    .share-box {
+        flex-direction: column;
+    }
+    
+    .share-box button {
+        width: 100%;
+        padding: 0.75rem;
+    }
+}
