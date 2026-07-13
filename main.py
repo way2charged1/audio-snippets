@@ -69,7 +69,7 @@ def get_jiosaavn_stream(query):
         except Exception:
             continue
             
-    raise Exception("Song not found on JioSaavn even after fallback searches")
+    raise Exception("Failed to find audio stream for this song. Please make sure the link is a valid music track.")
 
 # Use system ffmpeg if available (e.g. on Render), otherwise fallback to imageio_ffmpeg
 if shutil.which("ffmpeg"):
